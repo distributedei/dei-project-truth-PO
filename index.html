@@ -928,8 +928,8 @@ function autoFillVendor() {
   const v = vendors.find(x=>(x.Title||'')===n);
   if (v) {
     // Try common field names from prequal form
-    const email = v.Email||v.ContactEmail||v.VendorEmail||v.field_1||'';
-    const contact = v.ContactName||v.PrimaryContact||v.Contact||v.field_2||'';
+    const email = v.SalesEmail||'';
+    const contact = v.SalesName||'';
     document.getElementById('fVendorEmail').value   = email;
     document.getElementById('fVendorContact').value = contact;
   }
