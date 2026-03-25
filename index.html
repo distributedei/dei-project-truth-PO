@@ -602,7 +602,7 @@ function setConn(ok) {
 // ═══════════════════════════════════════════════════════
 async function loadDropdowns() {
   try {
-    const d = await gGet(`${SITE}/lists/${L_PROJ}/items?$expand=fields&$select=fields/Title,fields/ProjectName&$top=500`);
+    const d = await gGet(`${SITE}/lists/${L_PROJ}/items?$expand=fields&$top=500`);
     projects = (d.value||[]).map(i => i.fields).sort((a,b) => (a.Title||'').localeCompare(b.Title||''));
     fillSel('fProject', projects, 'Title', 'Title');
   } catch(e) { console.warn('Projects:', e.message); }
@@ -925,10 +925,14 @@ function collectLI() {
 // ═══════════════════════════════════════════════════════
 function autoFillVendor() {
   const n = document.getElementById('fVendor').value;
-  const v = vendors.find(x=>(x.Title||'')=== n);
-  document.getElementById('fVendorDet').value = v
-    ? [v.Address, v.City, v.State].filter(Boolean).join(', ') || n
-    : '';
+  const v = vendors.find(x=>(x.Title||'')===n);
+  if (v) {
+    // Try common field names from prequal form
+    const email = v.Email||v.ContactEmail||v.VendorEmail||v.field_1||'';
+    const contact = v.ContactName||v.PrimaryContact||v.Contact||v.field_2||'';
+    document.getElementById('fVendorEmail').value   = email;
+    document.getElementById('fVendorContact').value = contact;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
