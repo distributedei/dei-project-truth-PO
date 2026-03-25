@@ -1347,56 +1347,55 @@ function sendStatusEmail(po) {
 
 function buildEmailBody(po) {
   const li = parseLI(po.LineItemsJSON);
-  const liLines = li.map((l, i) =>
-    `  ${i+1}. ${l.description || '—'}  |  Qty: ${l.qty}  |  Unit: ${fmtC(l.unitPrice)}  |  Total: ${fmtC(l.total)}`
-  ).join('
-');
-
-  return `PURCHASE ORDER NOTIFICATION
-Distributed Energy Infrastructure LLC
-
-A Purchase Order has been submitted for signature. Please review the details below.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PO NUMBER:    ${po.Title || '—'}
-DATE:         ${fmtD(po.PODate)}
-PROJECT:      ${po.ProjectName || '—'}
-PO TYPE:      ${po.POType || '—'}
-STATUS:       Sent for Signature
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VENDOR
-Company:      ${po.VendorName || '—'}
-Contact:      ${po.VendorContact || '—'}
-Email:        ${po.VendorEmail || '—'}
-
-DEI PERSONNEL
-Ship To:      ${po.ShipTo || '—'}
-Contact 1:    ${po.Contact1 || '—'}
-Created By:   ${po.CreatedBy || '—'}
-Ball in Court: ${po.BallInCourt || '—'}
-
-LINE ITEMS
-${liLines || '  No line items'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUBTOTAL:     ${fmtC(po.Subtotal)}
-TAX:          ${fmtC(po.Tax)}
-SHIPPING:     ${fmtC(po.Shipping)}
-OTHER:        ${fmtC(po.OtherCharges)}
-TOTAL:        ${fmtC(po.Total)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${po.Comments ? '
-COMMENTS:
-' + po.Comments + '
-' : ''}
-SIGNING ORDER:
-1. ${po.VendorContact || po.VendorName || 'Vendor'} (${po.VendorEmail || '—'}) — signs first
-2. Prateek Tare (${PRATEEK_EMAIL}) — countersigns
-
-This is an automated notification from the DEI Purchase Order system.
-Distributed Energy Infrastructure LLC · 499 SE Balboa Ave Suite 1, Stuart FL 34994
-`;
+  const SEP = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  const liLines = li.length ? li.map(function(l,i){return '  '+(i+1)+'. '+(l.description||'--')+'  |  Qty: '+l.qty+'  |  Unit: '+fmtC(l.unitPrice)+'  |  Total: '+fmtC(l.total);}).join('\n') : '  No line items';
+  const lines = [
+    'PURCHASE ORDER NOTIFICATION',
+    'Distributed Energy Infrastructure LLC',
+    '',
+    'A Purchase Order has been submitted for signature. Please review the details below.',
+    '',
+    SEP,
+    'PO NUMBER:    ' + (po.Title||'—'),
+    'DATE:         ' + fmtD(po.PODate),
+    'PROJECT:      ' + (po.ProjectName||'—'),
+    'PO TYPE:      ' + (po.POType||'—'),
+    'STATUS:       Sent for Signature',
+    SEP,
+    '',
+    'VENDOR',
+    'Company:      ' + (po.VendorName||'—'),
+    'Contact:      ' + (po.VendorContact||'—'),
+    'Email:        ' + (po.VendorEmail||'—'),
+    '',
+    'DEI PERSONNEL',
+    'Ship To:      ' + (po.ShipTo||'—'),
+    'Contact 1:    ' + (po.Contact1||'—'),
+    'Created By:   ' + (po.CreatedBy||'—'),
+    'Ball in Court: ' + (po.BallInCourt||'—'),
+    '',
+    'LINE ITEMS',
+    liLines,
+    '',
+    SEP,
+    'SUBTOTAL:     ' + fmtC(po.Subtotal),
+    'TAX:          ' + fmtC(po.Tax),
+    'SHIPPING:     ' + fmtC(po.Shipping),
+    'OTHER:        ' + fmtC(po.OtherCharges),
+    'TOTAL:        ' + fmtC(po.Total),
+    SEP,
+  ];
+  if (po.Comments) { lines.push('', 'COMMENTS:', po.Comments); }
+  lines.push(
+    '',
+    'SIGNING ORDER:',
+    '1. ' + (po.VendorContact||po.VendorName||'Vendor') + ' (' + (po.VendorEmail||'—') + ') — signs first',
+    '2. Prateek Tare (' + PRATEEK_EMAIL + ') — countersigns',
+    '',
+    'This is an automated notification from the DEI Purchase Order system.',
+    'Distributed Energy Infrastructure LLC · 499 SE Balboa Ave Suite 1, Stuart FL 34994'
+  );
+  return lines.join('\n');
 }
 
 // Auto-login check
