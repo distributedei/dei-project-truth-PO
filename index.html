@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DEI · Purchase Orders</title>
   <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root {
       --navy:      #375673;
@@ -328,6 +330,8 @@
     <div style="display:flex;gap:8px;">
       <button class="btn btn-secondary btn-sm" onclick="closePanel()">Close</button>
       <button class="btn btn-danger btn-sm" id="dpDeleteBtn">Delete</button>
+      <button class="btn btn-secondary btn-sm" id="dpPdfBtn" onclick="generatePDF(currentPO)">⬇ Download PDF</button>
+      <button class="btn" style="background:#1a5276;color:#fff;font-size:11.5px;padding:5px 12px;border-radius:6px;font-weight:700;cursor:pointer;" id="dpDocuBtn" onclick="sendToDocuSign(currentPO)">✍ Send to DocuSign</button>
       <button class="btn btn-primary btn-sm" id="dpEditBtn">Open &amp; Edit</button>
     </div>
   </div>
@@ -391,14 +395,18 @@
       <!-- VENDOR -->
       <div class="fs">
         <div class="fs-title">Vendor</div>
-        <div class="fg">
+        <div class="fg3">
           <div class="fgrp">
             <label>Vendor *</label>
             <input type="text" class="fc" id="fVendor" placeholder="Enter vendor name">
           </div>
           <div class="fgrp">
-            <label>Vendor Details (auto-filled)</label>
-            <input type="text" class="fc" id="fVendorDet" disabled placeholder="Auto-populated from Vendor List">
+            <label>Vendor Email *</label>
+            <input type="email" class="fc" id="fVendorEmail" placeholder="vendor@company.com">
+          </div>
+          <div class="fgrp">
+            <label>Vendor Contact Name</label>
+            <input type="text" class="fc" id="fVendorContact" placeholder="Signatory name">
           </div>
         </div>
       </div>
@@ -705,6 +713,7 @@ function showView(v) {
 function openDetail(id) {
   const po = allPOs.find(p=>p.id===id);
   if (!po) return;
+  currentPO = po;
 
   const st = po.POStatus||po.Status||'Draft';
   const li = parseLI(po.LineItemsJSON);
@@ -810,6 +819,8 @@ function openEditModal(po) {
   document.getElementById('fType').value         = po.POType||'Equipment';
   document.getElementById('fStatus').value       = po.POStatus||po.Status||'Draft';
   document.getElementById('fVendor').value       = po.VendorName||po.Vendor||'';
+  document.getElementById('fVendorEmail').value  = po.VendorEmail||'';
+  document.getElementById('fVendorContact').value= po.VendorContact||'';
   document.getElementById('fVendorDet').value    = po.VendorDetails||'';
   document.getElementById('fShipTo').value       = po.ShipTo||'';
   document.getElementById('fContact1').value     = po.Contact1||'';
@@ -830,7 +841,7 @@ function openEditModal(po) {
 function closeModal() { document.getElementById('poModal').classList.remove('open'); }
 
 function resetForm() {
-  ['fNum','fSellerQuote','fVendorDet','fBIC','fComments'].forEach(id=>document.getElementById(id).value='');
+  ['fNum','fSellerQuote','fVendorEmail','fVendorContact','fBIC','fComments'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('fDate').value     = new Date().toISOString().split('T')[0];
   document.getElementById('fProject').value  = '';
   document.getElementById('fType').value     = 'Equipment';
@@ -950,7 +961,8 @@ async function submitPO() {
     POStatus:     status,
     ProjectName:  proj,
     VendorName:   ven,
-    VendorDetails:document.getElementById('fVendorDet').value,
+    VendorEmail:  document.getElementById('fVendorEmail').value,
+    VendorContact:document.getElementById('fVendorContact').value,
     SellerQuote:  document.getElementById('fSellerQuote').value,
     POType:       document.getElementById('fType').value,
     ShipTo:       document.getElementById('fShipTo').value,
@@ -1009,6 +1021,382 @@ function toast(msg, type='') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast'+(type?' '+type:'')+' show';
   setTimeout(()=>t.classList.remove('show'), 3500);
+}
+
+
+// ═══════════════════════════════════════════════════════
+//  DOCUSIGN CONFIG
+// ═══════════════════════════════════════════════════════
+const DS_ACCOUNT_ID   = 'a1d2b3ec-0fb8-49f9-b2f1-64fd171d3eb7';
+const DS_BASE_URI     = 'https://na4.docusign.net';
+const DS_INT_KEY      = ''; // TODO: paste Integration Key when dev account ready
+const DS_SECRET       = ''; // TODO: paste Secret Key
+const DS_ACCESS_TOKEN = ''; // TODO: paste Access Token
+const PRATEEK_EMAIL   = 'ptare@distributedei.com';
+const PRATEEK_NAME    = 'Prateek Tare';
+const PROCUREMENT_EMAIL = 'procurement@distributedei.com';
+
+// current PO reference for detail panel buttons
+let currentPO = null;
+
+// ═══════════════════════════════════════════════════════
+//  PDF GENERATION (jsPDF)
+// ═══════════════════════════════════════════════════════
+function generatePDF(po) {
+  if (!po) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth();
+  const navy  = [55, 86, 115];
+  const green = [119, 157, 54];
+  const li = parseLI(po.LineItemsJSON);
+
+  // Header bar
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, W, 70, 'F');
+
+  // Company info
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+  doc.text('PURCHASE ORDER', 40, 30);
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  doc.text('Distributed Energy Infrastructure LLC', 40, 44);
+  doc.text('499 SE Balboa Ave Suite 1, Stuart FL 34994  ·  (772) 000-0555', 40, 55);
+  doc.text('www.distributedei.com', 40, 66);
+
+  // PO number top right
+  doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...green);
+  doc.text(po.Title || '—', W - 40, 35, { align: 'right' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.setTextColor(200, 220, 200);
+  doc.text('Status: ' + (po.POStatus || 'Draft'), W - 40, 50, { align: 'right' });
+  doc.text('Date: ' + fmtD(po.PODate), W - 40, 62, { align: 'right' });
+
+  let y = 90;
+
+  // PO Header section
+  doc.setTextColor(...navy);
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+  doc.setFillColor(240, 244, 248);
+  doc.rect(40, y, W - 80, 16, 'F');
+  doc.text('PO DETAILS', 46, y + 11);
+  y += 24;
+
+  const poDetails = [
+    ['Project', po.ProjectName || '—', 'PO Type', po.POType || '—'],
+    ['Seller Quote #', po.SellerQuote || '—', 'Created By', po.CreatedBy || '—'],
+    ['Ball in Court', po.BallInCourt || '—', 'Date', fmtD(po.PODate)],
+  ];
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  poDetails.forEach(row => {
+    doc.setTextColor(100, 120, 140); doc.text(row[0] + ':', 46, y);
+    doc.setTextColor(30, 40, 50);   doc.text(row[1], 160, y);
+    doc.setTextColor(100, 120, 140); doc.text(row[2] + ':', W/2 + 10, y);
+    doc.setTextColor(30, 40, 50);   doc.text(row[3], W/2 + 120, y);
+    y += 16;
+  });
+  y += 8;
+
+  // Vendor section
+  doc.setFillColor(240, 244, 248);
+  doc.rect(40, y, W - 80, 16, 'F');
+  doc.setTextColor(...navy); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('VENDOR', 46, y + 11);
+  y += 24;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.setTextColor(100, 120, 140); doc.text('Vendor:', 46, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.VendorName || '—', 160, y);
+  doc.setTextColor(100, 120, 140); doc.text('Contact:', W/2 + 10, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.VendorContact || '—', W/2 + 120, y);
+  y += 16;
+  doc.setTextColor(100, 120, 140); doc.text('Email:', 46, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.VendorEmail || '—', 160, y);
+  y += 20;
+
+  // DEI Personnel
+  doc.setFillColor(240, 244, 248);
+  doc.rect(40, y, W - 80, 16, 'F');
+  doc.setTextColor(...navy); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('DEI PERSONNEL', 46, y + 11);
+  y += 24;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.setTextColor(100, 120, 140); doc.text('Ship To:', 46, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.ShipTo || '—', 160, y);
+  doc.setTextColor(100, 120, 140); doc.text('Contact 1:', W/2 + 10, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.Contact1 || '—', W/2 + 120, y);
+  y += 16;
+  doc.setTextColor(100, 120, 140); doc.text('Contact 2:', 46, y);
+  doc.setTextColor(30, 40, 50); doc.text(po.Contact2 || '—', 160, y);
+  y += 20;
+
+  // Line Items table
+  doc.setFillColor(240, 244, 248);
+  doc.rect(40, y, W - 80, 16, 'F');
+  doc.setTextColor(...navy); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('LINE ITEMS', 46, y + 11);
+  y += 10;
+
+  if (li.length) {
+    doc.autoTable({
+      startY: y + 4,
+      margin: { left: 40, right: 40 },
+      head: [['#', 'Description', 'Job Task', 'QTY', 'Unit Price', 'Total']],
+      body: li.map((l, i) => [
+        i + 1,
+        l.description || '—',
+        l.jobTask || '—',
+        l.qty || 1,
+        fmtC(l.unitPrice),
+        fmtC(l.total || (l.qty * l.unitPrice))
+      ]),
+      headStyles: { fillColor: navy, textColor: 255, fontSize: 8, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8, textColor: [30, 40, 50] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 0: { cellWidth: 24 }, 3: { cellWidth: 36, halign: 'center' }, 4: { cellWidth: 70, halign: 'right' }, 5: { cellWidth: 70, halign: 'right' } }
+    });
+    y = doc.lastAutoTable.finalY + 12;
+  } else {
+    y += 20;
+  }
+
+  // Totals
+  const totalsX = W - 200;
+  const totals = [
+    ['Subtotal', fmtC(po.Subtotal)],
+    ['Tax', fmtC(po.Tax)],
+    ['Shipping', fmtC(po.Shipping)],
+    ['Other', fmtC(po.OtherCharges)],
+  ];
+  doc.setFontSize(9);
+  totals.forEach(([lbl, val]) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 120, 140); doc.text(lbl, totalsX, y);
+    doc.setTextColor(30, 40, 50); doc.text(val, W - 40, y, { align: 'right' });
+    y += 14;
+  });
+  doc.setDrawColor(...green); doc.line(totalsX, y - 4, W - 40, y - 4);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.setTextColor(...navy); doc.text('TOTAL', totalsX, y + 8);
+  doc.setTextColor(...green); doc.text(fmtC(po.Total), W - 40, y + 8, { align: 'right' });
+  y += 24;
+
+  // Comments
+  if (po.Comments) {
+    doc.setFillColor(240, 244, 248);
+    doc.rect(40, y, W - 80, 16, 'F');
+    doc.setTextColor(...navy); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('COMMENTS / SPECIAL INSTRUCTIONS', 46, y + 11);
+    y += 22;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 40, 50); doc.setFontSize(8.5);
+    const lines = doc.splitTextToSize(po.Comments, W - 100);
+    doc.text(lines, 46, y);
+    y += lines.length * 12 + 16;
+  }
+
+  // Signature block
+  if (doc.internal.getNumberOfPages() === 1 && y > 600) doc.addPage();
+  y = Math.max(y, 580);
+  doc.setDrawColor(180, 190, 200);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(80, 100, 120);
+
+  // Vendor sig
+  doc.line(46, y + 30, 240, y + 30);
+  doc.text('Vendor Signature', 46, y + 42);
+  doc.text(po.VendorName || 'Vendor', 46, y + 52);
+  doc.line(260, y + 30, 330, y + 30);
+  doc.text('Date', 260, y + 42);
+
+  // DEI sig
+  doc.line(W/2 + 20, y + 30, W/2 + 214, y + 30);
+  doc.text('Authorized DEI Signature', W/2 + 20, y + 42);
+  doc.text('Prateek Tare — Distributed Energy Infrastructure LLC', W/2 + 20, y + 52);
+  doc.line(W/2 + 234, y + 30, W/2 + 304, y + 30);
+  doc.text('Date', W/2 + 234, y + 42);
+
+  // Footer
+  doc.setFillColor(...navy);
+  doc.rect(0, doc.internal.pageSize.getHeight() - 28, W, 28, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+  doc.text('Distributed Energy Infrastructure LLC  ·  499 SE Balboa Ave Suite 1, Stuart FL 34994  ·  (772) 000-0555  ·  Standard Terms and Conditions Apply', W/2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+
+  const filename = `${po.Title || 'PO'}_${po.ProjectName || 'DEI'}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  doc.save(filename);
+  return doc.output('arraybuffer');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SEND TO DOCUSIGN
+// ═══════════════════════════════════════════════════════
+async function sendToDocuSign(po) {
+  if (!po) return;
+
+  const vendorEmail = po.VendorEmail;
+  const vendorName  = po.VendorName || 'Vendor';
+  const vendorContact = po.VendorContact || vendorName;
+
+  if (!vendorEmail) {
+    toast('No vendor email on this PO — edit and add one first', 'error');
+    return;
+  }
+
+  // Check if we have a token
+  if (!DS_ACCESS_TOKEN) {
+    // Fallback: download PDF and open mailto
+    toast('DocuSign token not yet configured — downloading PDF for manual send', 'error');
+    generatePDF(po);
+    sendStatusEmail(po);
+    return;
+  }
+
+  const btn = document.getElementById('dpDocuBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    // Generate PDF as base64
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    generatePDF(po); // already saves — we need base64 version
+    const pdfBytes = doc.output('arraybuffer');
+    const pdfB64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+    const filename = `${po.Title || 'PO'}_${po.ProjectName || 'DEI'}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+
+    // Build DocuSign envelope
+    const envelope = {
+      emailSubject: `Purchase Order ${po.Title} — Signature Required`,
+      emailBlurb: buildEmailBody(po),
+      documents: [{
+        documentBase64: pdfB64,
+        name: filename,
+        fileExtension: 'pdf',
+        documentId: '1'
+      }],
+      recipients: {
+        signers: [
+          {
+            email: vendorEmail,
+            name: vendorContact,
+            recipientId: '1',
+            routingOrder: '1',
+            tabs: {
+              signHereTabs: [{ anchorString: 'Vendor Signature', anchorXOffset: '0', anchorYOffset: '-20', anchorUnits: 'pixels' }],
+              dateSignedTabs: [{ anchorString: 'Date', anchorXOffset: '0', anchorYOffset: '-20', anchorUnits: 'pixels', recipientId: '1' }]
+            }
+          },
+          {
+            email: PRATEEK_EMAIL,
+            name: PRATEEK_NAME,
+            recipientId: '2',
+            routingOrder: '2',
+            tabs: {
+              signHereTabs: [{ anchorString: 'Authorized DEI Signature', anchorXOffset: '0', anchorYOffset: '-20', anchorUnits: 'pixels' }],
+              dateSignedTabs: [{ anchorString: 'Date', anchorXOffset: '260', anchorYOffset: '-20', anchorUnits: 'pixels', recipientId: '2' }]
+            }
+          }
+        ],
+        carbonCopies: [
+          { email: PROCUREMENT_EMAIL, name: 'DEI Procurement', recipientId: '3', routingOrder: '3' }
+        ]
+      },
+      status: 'sent'
+    };
+
+    const resp = await fetch(`${DS_BASE_URI}/restapi/v2.1/accounts/${DS_ACCOUNT_ID}/envelopes`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DS_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(envelope)
+    });
+
+    if (!resp.ok) throw new Error(`DocuSign ${resp.status}: ${await resp.text()}`);
+    const result = await resp.json();
+
+    // Update PO status in SharePoint
+    await gPatch(`${SITE}/lists/${L_PO}/items/${po.id}/fields`, {
+      POStatus: 'Submitted',
+      DocuSignEnvelopeId: result.envelopeId,
+      DocuSignStatus: 'Sent'
+    });
+
+    // Send status email
+    sendStatusEmail(po);
+
+    toast(`Sent to DocuSign — Envelope ${result.envelopeId}`, 'success');
+    await loadPOs();
+    closePanel();
+
+  } catch(e) {
+    toast('DocuSign error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✍ Send to DocuSign'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATUS EMAIL (mailto fallback — Power Automate ready)
+// ═══════════════════════════════════════════════════════
+function sendStatusEmail(po) {
+  const subject = `PO ${po.Title} — Sent for Signature | ${po.ProjectName || 'DEI'}`;
+  const body = buildEmailBody(po);
+  const to = [po.VendorEmail, PRATEEK_EMAIL, PROCUREMENT_EMAIL].filter(Boolean).join(';');
+  const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(mailto, '_blank');
+}
+
+function buildEmailBody(po) {
+  const li = parseLI(po.LineItemsJSON);
+  const liLines = li.map((l, i) =>
+    `  ${i+1}. ${l.description || '—'}  |  Qty: ${l.qty}  |  Unit: ${fmtC(l.unitPrice)}  |  Total: ${fmtC(l.total)}`
+  ).join('
+');
+
+  return `PURCHASE ORDER NOTIFICATION
+Distributed Energy Infrastructure LLC
+
+A Purchase Order has been submitted for signature. Please review the details below.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PO NUMBER:    ${po.Title || '—'}
+DATE:         ${fmtD(po.PODate)}
+PROJECT:      ${po.ProjectName || '—'}
+PO TYPE:      ${po.POType || '—'}
+STATUS:       Sent for Signature
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VENDOR
+Company:      ${po.VendorName || '—'}
+Contact:      ${po.VendorContact || '—'}
+Email:        ${po.VendorEmail || '—'}
+
+DEI PERSONNEL
+Ship To:      ${po.ShipTo || '—'}
+Contact 1:    ${po.Contact1 || '—'}
+Created By:   ${po.CreatedBy || '—'}
+Ball in Court: ${po.BallInCourt || '—'}
+
+LINE ITEMS
+${liLines || '  No line items'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUBTOTAL:     ${fmtC(po.Subtotal)}
+TAX:          ${fmtC(po.Tax)}
+SHIPPING:     ${fmtC(po.Shipping)}
+OTHER:        ${fmtC(po.OtherCharges)}
+TOTAL:        ${fmtC(po.Total)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${po.Comments ? '
+COMMENTS:
+' + po.Comments + '
+' : ''}
+SIGNING ORDER:
+1. ${po.VendorContact || po.VendorName || 'Vendor'} (${po.VendorEmail || '—'}) — signs first
+2. Prateek Tare (${PRATEEK_EMAIL}) — countersigns
+
+This is an automated notification from the DEI Purchase Order system.
+Distributed Energy Infrastructure LLC · 499 SE Balboa Ave Suite 1, Stuart FL 34994
+`;
 }
 
 // Auto-login check
