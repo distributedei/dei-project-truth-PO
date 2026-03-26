@@ -568,8 +568,14 @@ let me = null, allPOs = [], projects = [], vendors = [], employees = [], liCtr =
 
 async function signIn() {
   try {
-    const r = await msal_app.loginPopup({ scopes: SCOPES });
-    me = r.account; boot();
+    // Use redirect on mobile Safari (popup blocked), popup on desktop
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      await msal_app.loginRedirect({ scopes: SCOPES });
+    } else {
+      const r = await msal_app.loginPopup({ scopes: SCOPES });
+      me = r.account; boot();
+    }
   } catch(e) { toast('Sign in failed: ' + e.message, 'error'); }
 }
 
@@ -1538,6 +1544,12 @@ function openCOModal(po) {
 // Auto-login check
 (async () => {
   await msal_app.initialize();
+  // Handle redirect response (mobile)
+  try {
+    const resp = await msal_app.handleRedirectPromise();
+    if (resp) { me = resp.account; boot(); return; }
+  } catch(e) { console.warn('Redirect error:', e); }
+  // Check existing session
   const accts = msal_app.getAllAccounts();
   if (accts.length) { me = accts[0]; boot(); }
 })();
