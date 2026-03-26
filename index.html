@@ -1085,7 +1085,7 @@ async function submitPO() {
 
   const fields = {
     Title:        editPO ? (editPO.Title||editPO.PONumber) : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-    PODate:       document.getElementById('fDate').value || null,
+    PODate:       document.getElementById('fDate').value ? document.getElementById('fDate').value + 'T00:00:00Z' : null,
     POStatus:     status,
     ProjectName:  proj,
     VendorName:   ven,
