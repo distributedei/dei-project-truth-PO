@@ -604,7 +604,7 @@ async function loadDropdowns() {
   try {
     const d = await gGet(`${SITE}/lists/${L_PROJ}/items?$expand=fields&$top=500`);
     projects = (d.value||[]).map(i => i.fields).sort((a,b) => (a.Title||'').localeCompare(b.Title||''));
-    fillSel('fProject', projects, 'Title', 'Title');
+    fillSel('fProject', projects, 'ProjectName', 'ProjectName');
   } catch(e) { console.warn('Projects:', e.message); }
 
   try {
