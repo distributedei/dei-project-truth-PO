@@ -416,7 +416,7 @@
         <div class="fs-title">DEI Personnel</div>
         <div class="fg3">
           <div class="fgrp">
-            <label>Ship To</label>
+            <label>Site Contact</label>
             <select class="fc" id="fShipTo"><option value="">— Select —</option></select>
           </div>
           <div class="fgrp">
@@ -427,6 +427,17 @@
             <label>Contact 2</label>
             <select class="fc" id="fContact2"><option value="">— Select —</option></select>
           </div>
+        </div>
+        <div class="fg3" style="margin-top:13px;">
+          <div class="fgrp">
+            <label>Site Contact Phone</label>
+            <input type="text" class="fc" id="fShipPhone" placeholder="Auto-populated">
+          </div>
+          <div class="fgrp">
+            <label>Site Contact Email</label>
+            <input type="text" class="fc" id="fShipEmail" placeholder="Auto-populated">
+          </div>
+          <div class="fgrp"></div>
         </div>
         <div class="fg" style="margin-top:13px;">
           <div class="fgrp">
@@ -619,11 +630,12 @@ async function loadDropdowns() {
   try {
     const d = await gGet(`${SITE}/lists/${L_EMP}/items?$expand=fields&$top=300`);
     employees = (d.value||[]).map(i => i.fields).sort((a,b) => (a.Title||'').localeCompare(b.Title||''));
-    const names = employees.map(e => e.Title||e.FullName||'').filter(Boolean);
+    const names = employees.map(e => e.Title||'').filter(Boolean);
     ['fShipTo','fContact1','fContact2'].forEach(id => {
       const s = document.getElementById(id);
       s.innerHTML = '<option value="">— Select —</option>' + names.map(n=>`<option value="${n}">${n}</option>`).join('');
     });
+    document.getElementById('fShipTo').onchange = autoFillSiteContact;
   } catch(e) { console.warn('Employees:', e.message); }
 }
 
@@ -830,6 +842,8 @@ function openEditModal(po) {
   document.getElementById('fVendorContact').value= po.VendorContact||'';
   document.getElementById('fVendorDet').value    = po.VendorDetails||'';
   document.getElementById('fShipTo').value       = po.ShipTo||'';
+  document.getElementById('fShipPhone').value    = po.ShipPhone||'';
+  document.getElementById('fShipEmail').value    = po.ShipEmail||'';
   document.getElementById('fContact1').value     = po.Contact1||'';
   document.getElementById('fContact2').value     = po.Contact2||'';
   document.getElementById('fBIC').value          = po.BallInCourt||'';
@@ -848,7 +862,7 @@ function openEditModal(po) {
 function closeModal() { document.getElementById('poModal').classList.remove('open'); }
 
 function resetForm() {
-  ['fNum','fSellerQuote','fVendorEmail','fVendorContact','fBIC','fComments'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fNum','fSellerQuote','fVendorEmail','fVendorContact','fShipPhone','fShipEmail','fBIC','fComments'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('fDate').value     = new Date().toISOString().split('T')[0];
   document.getElementById('fProject').value  = '';
   document.getElementById('fType').value     = 'Equipment';
@@ -935,6 +949,18 @@ function autoFillVendor() {
   }
 }
 
+function autoFillSiteContact() {
+  const n = document.getElementById('fShipTo').value;
+  const e = employees.find(x=>(x.Title||'')===n);
+  if (e) {
+    document.getElementById('fShipPhone').value = e.field_2||'';
+    document.getElementById('fShipEmail').value = e.field_3||'';
+  } else {
+    document.getElementById('fShipPhone').value = '';
+    document.getElementById('fShipEmail').value = '';
+  }
+}
+
 // ═══════════════════════════════════════════════════════
 //  FILE HANDLING
 // ═══════════════════════════════════════════════════════
@@ -977,6 +1003,8 @@ async function submitPO() {
     SellerQuote:  document.getElementById('fSellerQuote').value,
     POType:       document.getElementById('fType').value,
     ShipTo:       document.getElementById('fShipTo').value,
+    ShipPhone:    document.getElementById('fShipPhone').value,
+    ShipEmail:    document.getElementById('fShipEmail').value,
     Contact1:     document.getElementById('fContact1').value,
     Contact2:     document.getElementById('fContact2').value,
     CreatedBy:    document.getElementById('fCreatedBy').value,
