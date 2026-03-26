@@ -421,7 +421,7 @@
         <div class="fg3">
           <div class="fgrp">
             <label>Vendor *</label>
-            <select class="fc" id="fVendor"><option value="">— Select Vendor —</option></select>
+            <select class="fc" id="fVendor" onchange="autoFillVendor()"><option value="">— Select Vendor —</option></select>
           </div>
           <div class="fgrp">
             <label>Vendor Email *</label>
@@ -440,11 +440,11 @@
         <div class="fg3">
           <div class="fgrp">
             <label>Site Contact</label>
-            <select class="fc" id="fShipTo"><option value="">— Select —</option></select>
+            <select class="fc" id="fShipTo" onchange="autoFillSiteContact()"><option value="">— Select —</option></select>
           </div>
           <div class="fgrp">
             <label>Project PM</label>
-            <select class="fc" id="fContact1"><option value="">— Select —</option></select>
+            <select class="fc" id="fContact1" onchange="autoFillPM()"><option value="">— Select —</option></select>
           </div>
           <div class="fgrp">
             <label>Approver</label>
@@ -549,7 +549,7 @@ const G          = 'https://graph.microsoft.com/v1.0';
 const SITE       = `${G}/sites/${SITE_ID}`;
 
 // SharePoint list names — adjust if yours differ
-const L_PO   = 'POList';
+const L_PO   = 'PO List';
 const L_PROJ = 'ProjectData';
 const L_VEN  = 'Vendors';
 const L_EMP  = 'Employees';
