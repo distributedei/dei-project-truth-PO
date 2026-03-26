@@ -1085,7 +1085,7 @@ async function submitPO() {
 
   const fields = {
     Title:        editPO ? (editPO.Title||editPO.PONumber) : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-    PODate:       document.getElementById('fDate').value ? new Date(document.getElementById('fDate').value).toISOString() : null,
+    PODate:       document.getElementById('fDate').value || null,
     POStatus:     status,
     ProjectName:  proj,
     VendorName:   ven,
@@ -1203,7 +1203,7 @@ function generatePDF(po) {
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(200, 220, 200);
   doc.text('Status: ' + (po.POStatus || 'Draft'), W - 40, 50, { align: 'right' });
-  doc.text('Date: ' + fmtD(po.Date), W - 40, 62, { align: 'right' });
+  doc.text('Date: ' + fmtD(po.PODate), W - 40, 62, { align: 'right' });
 
   let y = 90;
 
@@ -1218,7 +1218,7 @@ function generatePDF(po) {
   const poDetails = [
     ['Project', po.ProjectName || '—', 'PO Type', po.POType || '—'],
     ['Seller Quote #', po.SellerQuote || '—', 'Created By', po.CreatedBy || '—'],
-    ['Ball in Court', po.BallInCourt || '—', 'Date', fmtD(po.Date)],
+    ['Ball in Court', po.BallInCourt || '—', 'Date', fmtD(po.PODate)],
   ];
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
   poDetails.forEach(row => {
@@ -1489,7 +1489,7 @@ function buildEmailBody(po) {
     '',
     SEP,
     'PO NUMBER:    ' + (po.Title||'—'),
-    'DATE:         ' + fmtD(po.Date),
+    'DATE:         ' + fmtD(po.PODate),
     'PROJECT:      ' + (po.ProjectName||'—'),
     'PO TYPE:      ' + (po.POType||'—'),
     'STATUS:       Sent for Signature',
