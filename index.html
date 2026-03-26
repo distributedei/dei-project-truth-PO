@@ -820,7 +820,7 @@ function openDetail(id) {
   let body = `<div class="ar-wrap">${flowHtml}</div>`;
 
   body += section('PO Header', `<div class="dg">
-    ${df('PO Number',po.Title||'—')} ${df('Date',fmtD(po.PODate||po.Date))}
+    ${df('PO Number',po.Title||'—')} ${df('Date',fmtD(po.Date||po.Date))}
     ${df('Project',po.ProjectName||'—')} ${df('Seller Quote #',po.SellerQuote||'—')}
     ${df('PO Type',po.POType||'—')} ${df('Status',badge(st))}
     ${df('Ball in Court',po.BallInCourt||'—')} ${df('Created By',po.CreatedBy||'—')}
@@ -909,7 +909,7 @@ function openEditModal(po) {
   document.getElementById('submitBtn').textContent = 'Save Changes';
 
   document.getElementById('fNum').value          = po.Title||'';
-  document.getElementById('fDate').value         = (po.PODate||po.Date||'').split('T')[0];
+  document.getElementById('fDate').value         = (po.Date||po.Date||'').split('T')[0];
   document.getElementById('fProject').value      = po.ProjectName||'';
   document.getElementById('fSellerQuote').value  = po.SellerQuote||'';
   document.getElementById('fType').value         = po.POType||'Equipment';
@@ -1085,7 +1085,7 @@ async function submitPO() {
 
   const fields = {
     Title:        editPO ? (editPO.Title||editPO.PONumber) : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-    PODate:       document.getElementById('fDate').value,
+    Date:         document.getElementById('fDate').value,
     POStatus:     status,
     ProjectName:  proj,
     VendorName:   ven,
@@ -1203,7 +1203,7 @@ function generatePDF(po) {
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(200, 220, 200);
   doc.text('Status: ' + (po.POStatus || 'Draft'), W - 40, 50, { align: 'right' });
-  doc.text('Date: ' + fmtD(po.PODate), W - 40, 62, { align: 'right' });
+  doc.text('Date: ' + fmtD(po.Date), W - 40, 62, { align: 'right' });
 
   let y = 90;
 
@@ -1218,7 +1218,7 @@ function generatePDF(po) {
   const poDetails = [
     ['Project', po.ProjectName || '—', 'PO Type', po.POType || '—'],
     ['Seller Quote #', po.SellerQuote || '—', 'Created By', po.CreatedBy || '—'],
-    ['Ball in Court', po.BallInCourt || '—', 'Date', fmtD(po.PODate)],
+    ['Ball in Court', po.BallInCourt || '—', 'Date', fmtD(po.Date)],
   ];
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
   poDetails.forEach(row => {
@@ -1489,7 +1489,7 @@ function buildEmailBody(po) {
     '',
     SEP,
     'PO NUMBER:    ' + (po.Title||'—'),
-    'DATE:         ' + fmtD(po.PODate),
+    'DATE:         ' + fmtD(po.Date),
     'PROJECT:      ' + (po.ProjectName||'—'),
     'PO TYPE:      ' + (po.POType||'—'),
     'STATUS:       Sent for Signature',
